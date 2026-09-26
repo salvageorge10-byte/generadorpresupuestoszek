@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="assets/zek-logo-violet-2026.png">
+<title>ZEK · Presupuestos</title>
+<!--
+  Generador de presupuestos de ZEK Webs.
+  Se abre con doble clic. Sin build, sin servidor: los presupuestos
+  guardados viven en el localStorage de este navegador.
+  Para sacar el PDF: botón "Descargar PDF" → "Guardar como PDF".
+  Los planes y los textos de cada ítem están en PLANES e ITEMS (app.js).
+-->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-view="form">
+
+<div class="app">
+
+  <!-- ================= formulario ================= -->
+  <aside class="panel" aria-label="Datos del presupuesto">
+    <header class="panel-top">
+      <img src="assets/zek-logo-violet-2026.png" alt="">
+      <div>
+        <b>Presupuestos</b>
+        <span>ZEK Webs</span>
+      </div>
+    </header>
+
+    <form id="form" autocomplete="off">
+
+      <fieldset>
+        <legend>Cliente</legend>
+        <label>Instagram
+          <input name="instagram" placeholder="@nombredelnegocio" required>
+        </label>
+        <label><span>Nombre <small>opcional</small></span>
+          <input name="nombre" placeholder="Ej.: Emanuel">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Plan</legend>
+        <div class="plans" id="plans"></div>
+        <div class="row">
+          <label>Nombre del plan
+            <input name="planNombre">
+          </label>
+        </div>
+        <label>Bajada
+          <input name="planBajada">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Precio</legend>
+        <div class="row price-row">
+          <label class="grow">Monto
+            <input name="monto" inputmode="decimal" placeholder="290000">
+          </label>
+          <div class="currency" role="radiogroup" aria-label="Moneda">
+            <label><input type="radio" name="moneda" value="ARS" checked><span>ARS</span></label>
+            <label><input type="radio" name="moneda" value="USD"><span>USD</span></label>
+            <label><input type="radio" name="moneda" value="EUR"><span>EUR</span></label>
+          </div>
+        </div>
+        <p class="hint" id="precioLista"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Qué incluye</legend>
+        <p class="hint">Se marca solo al elegir el plan. Podés sacar o sumar ítems.</p>
+        <div id="items"></div>
+        <details class="extra">
+          <summary>Agregar un ítem que no está en la lista</summary>
+          <label>Título
+            <input id="extraTitulo" placeholder="Ej.: Carga inicial de productos">
+          </label>
+          <label>Detalle
+            <input id="extraDetalle" placeholder="Ej.: subimos los primeros 40 productos con fotos y precios.">
+          </label>
+          <button type="button" class="btn-sm" id="extraAdd">Agregar</button>
+        </details>
+      </fieldset>
+
+      <fieldset>
+        <legend>Resumen de la propuesta</legend>
+        <textarea name="resumen" rows="4"></textarea>
+        <button type="button" class="link" id="resumenReset">Volver al texto del plan</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Condiciones</legend>
+        <div class="row">
+          <label>Fecha
+            <input type="date" name="fecha">
+          </label>
+          <label><span>Validez <small>días</small></span>
+            <input name="validez" inputmode="numeric" value="15">
+          </label>
+        </div>
+        <label><span>Plazo de entrega <small>opcional</small></span>
+          <input name="plazo" placeholder="Ej.: 3 semanas desde el primer pago">
+        </label>
+        <label>Forma de pago
+          <textarea name="pago" rows="3"></textarea>
+        </label>
+      </fieldset>
+    </form>
+
+    <div class="actions">
+      <button type="button" class="btn" id="print">Descargar PDF</button>
+      <button type="button" class="btn-ghost" id="save">Guardar</button>
+      <button type="button" class="btn-ghost" id="nuevo">Nuevo</button>
+    </div>
+    <p class="status" id="status" role="status"></p>
+
+    <section class="saved">
+      <h2>Guardados</h2>
+      <ul id="savedList"></ul>
+    </section>
+  </aside>
+
+  <!-- ================= documento ================= -->
+  <main class="stage">
+    <article class="doc" id="doc"></article>
+  </main>
+
+</div>
+
+<!-- solo en celular y tablet: alterna formulario / hoja -->
+<nav class="mbar" aria-label="Vistas">
+  <button type="button" data-view="form" aria-pressed="true">Datos</button>
+  <button type="button" data-view="doc" aria-pressed="false">Vista previa</button>
+  <button type="button" class="mbar-pdf" id="printM">PDF</button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
