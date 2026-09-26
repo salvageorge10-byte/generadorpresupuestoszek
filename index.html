@@ -32,6 +32,37 @@
     <form id="form" autocomplete="off">
 
       <fieldset>
+        <legend>Documento</legend>
+        <div class="currency seg" role="radiogroup" aria-label="Tipo de documento">
+          <label><input type="radio" name="tipo" value="presupuesto" checked><span>Presupuesto</span></label>
+          <label><input type="radio" name="tipo" value="anticipo"><span>Recibo anticipo</span></label>
+          <label><input type="radio" name="tipo" value="saldo"><span>Recibo saldo</span></label>
+        </div>
+        <p class="hint" id="tipoHint">Para un recibo, abrí el presupuesto guardado del cliente y cambiá acá.</p>
+      </fieldset>
+
+      <fieldset id="reciboFs" hidden>
+        <legend>Recibo</legend>
+        <div class="row">
+          <label>N.º de recibo
+            <input name="reciboNumero" inputmode="numeric">
+          </label>
+          <label>Fecha de pago
+            <input type="date" name="reciboFecha">
+          </label>
+        </div>
+        <div class="row">
+          <label>Monto de este pago
+            <input name="reciboMonto" inputmode="decimal">
+          </label>
+          <label><span>Medio de pago <small>opcional</small></span>
+            <input name="reciboMedio" placeholder="Transferencia">
+          </label>
+        </div>
+        <p class="hint">El monto se precarga con la mitad del total del presupuesto.</p>
+      </fieldset>
+
+      <fieldset>
         <legend>Cliente</legend>
         <label>Instagram
           <input name="instagram" placeholder="@nombredelnegocio" required>
@@ -55,7 +86,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Precio</legend>
+        <legend>Precio total</legend>
         <div class="row price-row">
           <label class="grow">Monto
             <input name="monto" inputmode="decimal" placeholder="290000">

@@ -95,6 +95,13 @@
 
   var LS_DRAFT = 'zek-presupuestos:borrador';
   var LS_SAVED = 'zek-presupuestos:guardados';
+  var LS_RECIBO = 'zek-presupuestos:ultimoRecibo';
+
+  var MONEDA_LETRAS = {
+    ARS: ['peso', 'pesos'],
+    USD: ['dólar estadounidense', 'dólares estadounidenses'],
+    EUR: ['euro', 'euros']
+  };
 
   /* ---------------- estado ---------------- */
 
@@ -142,8 +149,76 @@
       validez: '15',
       plazo: '',
       extras: [],
-      pagoManual: false
+      pagoManual: false,
+      tipo: 'presupuesto',
+      reciboNumero: '',
+      reciboFecha: hoyISO(),
+      reciboMonto: '',
+      reciboMontoManual: false,
+      reciboMedio: ''
     });
+  }
+
+  // borradores y guardados de antes de que existieran los recibos
+  function completar(s) {
+    if (!s.extras) s.extras = [];
+    if (!s.tipo) s.tipo = 'presupuesto';
+    if (s.reciboNumero == null) s.reciboNumero = '';
+    if (!s.reciboFecha) s.reciboFecha = hoyISO();
+    if (s.reciboMonto == null) s.reciboMonto = '';
+    if (s.reciboMedio == null) s.reciboMedio = '';
+    return s;
+  }
+
+  /* ---------------- recibos ---------------- */
+
+  function mitad(total) {
+    return total == null ? '' : String(Math.round(total / 2 * 100) / 100);
+  }
+
+  function siguienteRecibo() {
+    var n = parseInt(leer(LS_RECIBO, 0), 10) || 0;
+    return String(n + 1).padStart(4, '0');
+  }
+
+  function registrarRecibo(numero) {
+    var n = parseInt(numero, 10);
+    if (n > (parseInt(leer(LS_RECIBO, 0), 10) || 0)) escribir(LS_RECIBO, n);
+  }
+
+  var U = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve',
+    'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho',
+    'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés', 'veinticuatro', 'veinticinco',
+    'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+  var D = ['', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+  var C = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos',
+    'setecientos', 'ochocientos', 'novecientos'];
+
+  function hasta99(n) { return n < 30 ? U[n] : D[Math.floor(n / 10)] + (n % 10 ? ' y ' + U[n % 10] : ''); }
+  function hasta999(n) {
+    if (n === 100) return 'cien';
+    var c = Math.floor(n / 100), r = n % 100;
+    return (c ? C[c] : '') + (c && r ? ' ' : '') + (r ? hasta99(r) : '');
+  }
+  // "uno" delante de un sustantivo: un mil → mil, veintiuno mil → veintiún mil
+  function apocope(t) { return t.replace(/veintiuno$/, 'veintiún').replace(/uno$/, 'un'); }
+  function enteroEnLetras(n) {
+    if (n === 0) return 'cero';
+    var partes = [];
+    var mill = Math.floor(n / 1e6), miles = Math.floor((n % 1e6) / 1000), resto = n % 1000;
+    if (mill) partes.push(mill === 1 ? 'un millón' : apocope(enteroEnLetras(mill)) + ' millones');
+    if (miles) partes.push(miles === 1 ? 'mil' : apocope(hasta999(miles)) + ' mil');
+    if (resto) partes.push(hasta999(resto));
+    return partes.join(' ');
+  }
+  function montoEnLetras(n, moneda) {
+    var entero = Math.floor(n + 1e-9);
+    var cent = Math.round((n - entero) * 100);
+    var nombre = MONEDA_LETRAS[moneda][entero === 1 ? 0 : 1];
+    var t = apocope(enteroEnLetras(entero));
+    if (/millón$|millones$/.test(t)) nombre = 'de ' + nombre;
+    t = t + ' ' + nombre + (cent ? ' con ' + String(cent).padStart(2, '0') + '/100' : '');
+    return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
   /* ---------------- utilidades ---------------- */
@@ -242,6 +317,12 @@
     form.validez.value = state.validez;
     form.plazo.value = state.plazo;
     form.pago.value = state.pago;
+    form.querySelector('input[name="tipo"][value="' + state.tipo + '"]').checked = true;
+    form.reciboNumero.value = state.reciboNumero;
+    form.reciboFecha.value = state.reciboFecha;
+    form.reciboMonto.value = state.reciboMonto;
+    form.reciboMedio.value = state.reciboMedio;
+    $('reciboFs').hidden = state.tipo === 'presupuesto';
     pintarPlanes();
     pintarItems();
     pintarPrecioLista();
@@ -266,9 +347,25 @@
       }
     } else if (t.name === 'moneda') {
       state.moneda = t.value;
+    } else if (t.name === 'tipo') {
+      state.tipo = t.value;
+      if (state.tipo !== 'presupuesto') {
+        if (!state.reciboNumero) state.reciboNumero = siguienteRecibo();
+        if (!state.reciboMontoManual) state.reciboMonto = mitad(parseMonto(state.monto));
+        form.reciboNumero.value = state.reciboNumero;
+        form.reciboMonto.value = state.reciboMonto;
+      }
+      $('reciboFs').hidden = state.tipo === 'presupuesto';
     } else if (t.name && t.name in state) {
       state[t.name] = t.value;
-      if (t.name === 'monto') state.montoManual = true;
+      if (t.name === 'monto') {
+        state.montoManual = true;
+        if (!state.reciboMontoManual) {
+          state.reciboMonto = mitad(parseMonto(state.monto));
+          form.reciboMonto.value = state.reciboMonto;
+        }
+      }
+      if (t.name === 'reciboMonto') state.reciboMontoManual = true;
       if (t.name === 'pago') state.pagoManual = true;
     }
     render();
@@ -316,6 +413,7 @@
   /* ---------------- documento ---------------- */
 
   function render() {
+    if (state.tipo !== 'presupuesto') { renderRecibo(); escribir(LS_DRAFT, state); return; }
     var s = state;
     var monto = parseMonto(s.monto);
     var conDominio = s.items.indexOf('dominio') !== -1;
@@ -384,6 +482,70 @@
     escribir(LS_DRAFT, state);
   }
 
+  function renderRecibo() {
+    var s = state;
+    var esAnticipo = s.tipo === 'anticipo';
+    var total = parseMonto(s.monto);
+    var pago = parseMonto(s.reciboMonto);
+    var fmt = function (n) { return esc(formatoMonto(n, s.moneda)); };
+    var cliente = s.nombre && s.instagram
+      ? esc(s.nombre) + ' <span class="d-ig">' + esc(s.instagram) + '</span>'
+      : esc(s.nombre || s.instagram || '—');
+
+    // en el saldo se asume que lo anterior fue el anticipo: total − este pago
+    var previos = (!esAnticipo && total != null && pago != null) ? Math.max(0, total - pago) : 0;
+    var pendiente = (total != null && pago != null) ? Math.max(0, total - previos - pago) : null;
+    var pct = (total && pago != null) ? Math.round(pago / total * 100) : null;
+
+    var concepto = esAnticipo
+      ? 'Anticipo' + (pct && pct < 100 ? ' del ' + pct + '%' : '')
+      : 'Saldo final' + (pct && pct < 100 ? ' del ' + pct + '%' : '');
+
+    var filas = [
+      ['Proyecto', esc(s.planNombre || 'Desarrollo web') + (s.planBajada ? '<small>' + esc(s.planBajada) + '</small>' : '')],
+      ['Total del proyecto', fmt(total)]
+    ];
+    if (!esAnticipo) filas.push(['Anticipo recibido', fmt(previos)]);
+    filas.push(['Este pago', '<b>' + fmt(pago) + '</b>']);
+    filas.push(['Saldo pendiente', pendiente === 0 ? '<b>' + fmt(0) + '</b>' : fmt(pendiente)]);
+
+    $('doc').innerHTML =
+      '<header class="d-head">' +
+        '<div class="d-brand"><img src="assets/zek-logo-white-2026.png" alt=""><span>ZEK WEBS</span></div>' +
+        '<h1>Recibo de pago</h1>' +
+        '<p>' + (esAnticipo ? 'Anticipo' : 'Saldo final') + ' · N.º ' + esc(s.reciboNumero || '—') + '</p>' +
+      '</header>' +
+
+      '<dl class="d-meta">' +
+        '<div><dt>Recibido de</dt><dd>' + cliente + '</dd></div>' +
+        '<div><dt>Fecha de pago</dt><dd>' + esc(fechaLarga(s.reciboFecha)) + '</dd></div>' +
+        '<div><dt>N.º de recibo</dt><dd>' + esc(s.reciboNumero || '—') + '</dd></div>' +
+        (s.reciboMedio.trim() ? '<div><dt>Medio de pago</dt><dd>' + esc(s.reciboMedio.trim()) + '</dd></div>' : '') +
+      '</dl>' +
+
+      '<section class="d-plan">' +
+        '<div class="d-plan-name"><h2>' + esc(concepto) + '</h2>' +
+          '<p>Desarrollo del sitio web · ' + esc(s.planNombre || 'Plan') + '</p></div>' +
+        '<div class="d-plan-price"><strong' + (pago == null ? ' class="empty"' : '') + '>' + fmt(pago) + '</strong>' +
+          '<span>Pago recibido · ' + s.moneda + '</span></div>' +
+      '</section>' +
+
+      (pago != null ? '<p class="d-letras"><b>Son:</b> ' + esc(montoEnLetras(pago, s.moneda)) + '.</p>' : '') +
+
+      '<section class="d-sec"><h2>Detalle del proyecto</h2><table class="d-tabla"><tbody>' +
+        filas.map(function (f) { return '<tr><th>' + f[0] + '</th><td>' + f[1] + '</td></tr>'; }).join('') +
+      '</tbody></table>' +
+      (pendiente === 0 ? '<p class="d-ok">Con este pago el proyecto queda cancelado en su totalidad.</p>' : '') +
+      '</section>' +
+
+      '<footer class="d-foot">' +
+        '<p>Comprobante de pago emitido por ZEK Webs. No válido como factura.</p>' +
+        '<p class="d-contact"><span>WhatsApp <b>' + CONTACTO.whatsapp + '</b></span>' +
+        '<span>Instagram <b>' + CONTACTO.instagram + '</b></span>' +
+        '<span><b>' + CONTACTO.web + '</b></span></p>' +
+      '</footer>';
+  }
+
   /* ---------------- guardar, cargar, PDF ---------------- */
 
   function aviso(t) {
@@ -423,7 +585,7 @@
     var lista = leer(LS_SAVED, []);
     if (a) {
       var q = lista.filter(function (x) { return x.id === a.dataset.abrir; })[0];
-      if (q) { state = q; volcarFormulario(); render(); aviso('Abierto el de ' + (q.instagram || q.nombre) + '.'); }
+      if (q) { state = completar(q); volcarFormulario(); render(); aviso('Abierto el de ' + (q.instagram || q.nombre) + '.'); }
     } else if (b) {
       if (!confirm('¿Borrar este presupuesto guardado?')) return;
       escribir(LS_SAVED, lista.filter(function (x) { return x.id !== b.dataset.borrar; }));
@@ -441,10 +603,16 @@
 
   function imprimir() {
     if (!state.instagram && !state.nombre) { verVista('form'); aviso('Falta el Instagram del cliente.'); form.instagram.focus(); return; }
-    if (parseMonto(state.monto) == null) { verVista('form'); aviso('Falta el monto.'); form.monto.focus(); return; }
+    if (parseMonto(state.monto) == null) { verVista('form'); aviso('Falta el monto total.'); form.monto.focus(); return; }
+    var recibo = state.tipo !== 'presupuesto';
+    if (recibo && parseMonto(state.reciboMonto) == null) { verVista('form'); aviso('Falta el monto de este pago.'); form.reciboMonto.focus(); return; }
+    if (recibo) registrarRecibo(state.reciboNumero);
     // el título es el nombre de archivo que propone "Guardar como PDF"
     var titulo = document.title;
-    document.title = 'Presupuesto ZEK - ' + (state.instagram || state.nombre).replace(/^@/, '');
+    var quien = (state.instagram || state.nombre).replace(/^@/, '');
+    document.title = recibo
+      ? 'Recibo ' + state.reciboNumero + ' ZEK - ' + quien + ' - ' + state.tipo
+      : 'Presupuesto ZEK - ' + quien;
     window.print();
     document.title = titulo;
   }
@@ -484,7 +652,7 @@
 
   state = leer(LS_DRAFT, null);
   if (!state || !state.items) state = estadoNuevo();
-  if (!state.extras) state.extras = [];
+  completar(state);
   volcarFormulario();
   render();
   pintarGuardados();
